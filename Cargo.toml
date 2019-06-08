@@ -1,0 +1,9 @@
+[package]
+name = "helper"
+version = "1.0.0"
+authors = ["__JM_Joy__ <918734043@qq.com>"]
+edition = "2018"
+repository = "https://github.com/jmjoy/helper"
+documentation = "https://docs.rs/helper/1.0.0/"
+
+[dependencies]
