@@ -24,7 +24,7 @@ macro_rules! if_or_else {
 #[macro_export]
 macro_rules! unwrap_or_return {
     ($x:expr) => {
-        unwrap_or_return!($x)
+        unwrap_or_return!($x, ())
     };
     ($x:expr, $ret:expr) => {
         match x {
@@ -37,7 +37,7 @@ macro_rules! unwrap_or_return {
 #[macro_export]
 macro_rules! unwrap_or_break {
     ($x:expr) => {
-        unwrap_or_break!($x)
+        unwrap_or_break!($x, ())
     };
     ($x:expr, $ret:expr) => {
         match x {
