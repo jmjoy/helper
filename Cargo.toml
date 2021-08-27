@@ -1,6 +1,6 @@
 [package]
 name = "helper"
-version = "2.0.0"
+version = "2.1.0-alpha.1"
 authors = ["jmjoy <918734043@qq.com>"]
 edition = "2018"
 repository = "https://github.com/jmjoy/helper"
