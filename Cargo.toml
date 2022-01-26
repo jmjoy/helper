@@ -1,11 +1,15 @@
 [package]
 name = "helper"
-version = "2.1.0-alpha.1"
+version = "3.0.0"
 authors = ["jmjoy <918734043@qq.com>"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.56"
 repository = "https://github.com/jmjoy/helper"
-documentation = "https://docs.rs/helper/1.0.0/"
-description = "A library provided some useful functions and macros for Rust."
+description = "A library provided some useful proc macros for Rust."
 license = "MulanPSL-2.0"
 
+[lib]
+proc-macro = true
+
 [dependencies]
+proc-macro2 = "1.0.36"
