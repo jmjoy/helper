@@ -1,0 +1,33 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ "**" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Install rust nightly
+      run: rustup toolchain install nightly
+    - name: Build
+      run: cargo build --verbose
+    - name: Format
+      run: cargo +nightly fmt --all -- --check
+    - name: Clippy
+      run: cargo clippy --verbose
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Doc
+      run: cargo +nightly rustdoc --all-features
