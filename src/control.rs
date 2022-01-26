@@ -11,33 +11,33 @@
 use proc_macro2::{TokenStream, TokenTree};
 
 enum EitherFlag {
-    CONDITION,
-    LEFT,
-    RIGHT,
+    Condition,
+    Left,
+    Right,
 }
 
 pub(crate) fn either(items: TokenStream) -> TokenStream {
     let mut condition = TokenStream::new();
     let mut left = TokenStream::new();
     let mut right = TokenStream::new();
-    let mut flag = EitherFlag::CONDITION;
+    let mut flag = EitherFlag::Condition;
 
     for item in items {
         match item {
             TokenTree::Punct(p) if p.as_char() == '?' => {
-                flag = EitherFlag::LEFT;
+                flag = EitherFlag::Left;
             }
             TokenTree::Punct(p) if p.as_char() == ':' => {
-                flag = EitherFlag::RIGHT;
+                flag = EitherFlag::Right;
             }
             _ => match flag {
-                EitherFlag::CONDITION => {
+                EitherFlag::Condition => {
                     condition.extend([item]);
                 }
-                EitherFlag::LEFT => {
+                EitherFlag::Left => {
                     left.extend([item]);
                 }
-                EitherFlag::RIGHT => {
+                EitherFlag::Right => {
                     right.extend([item]);
                 }
             },

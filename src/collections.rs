@@ -12,9 +12,9 @@ use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
 
 #[derive(PartialEq)]
 enum MapFlag {
-    NEW,
-    KEY,
-    VALUE,
+    New,
+    Key,
+    Value,
 }
 
 pub(crate) fn hmap(items: TokenStream) -> TokenStream {
@@ -23,36 +23,36 @@ pub(crate) fn hmap(items: TokenStream) -> TokenStream {
     }
 
     let mut len = 0usize;
-    let mut flag = MapFlag::NEW;
+    let mut flag = MapFlag::New;
     let mut new_items = Vec::new();
     let mut tmp_item = (TokenStream::new(), TokenStream::new());
 
     for item in items {
-        if flag == MapFlag::NEW {
-            flag = MapFlag::KEY;
+        if flag == MapFlag::New {
+            flag = MapFlag::Key;
             len += 1;
         }
 
         match item {
             TokenTree::Punct(p) if p.as_char() == ':' => {
-                flag = MapFlag::VALUE;
+                flag = MapFlag::Value;
             }
             TokenTree::Punct(p) if p.as_char() == ',' => {
                 new_items.push(tmp_item);
                 tmp_item = (TokenStream::new(), TokenStream::new());
-                flag = MapFlag::NEW;
+                flag = MapFlag::New;
             }
             _ => {
-                if flag == MapFlag::KEY {
+                if flag == MapFlag::Key {
                     tmp_item.0.extend([item]);
-                } else if flag == MapFlag::VALUE {
+                } else if flag == MapFlag::Value {
                     tmp_item.1.extend([item]);
                 }
             }
         }
     }
 
-    if flag != MapFlag::NEW {
+    if flag != MapFlag::New {
         new_items.push(tmp_item);
     }
 

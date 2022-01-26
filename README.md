@@ -1,5 +1,6 @@
 # Helper
 
+[![Rust](https://github.com/jmjoy/helper/actions/workflows/rust.yml/badge.svg)](https://github.com/jmjoy/helper/actions/workflows/rust.yml)
 [![Crate](https://img.shields.io/crates/v/helper.svg)](https://crates.io/crates/helper)
 [![API](https://docs.rs/helper/badge.svg)](https://docs.rs/helper)
 
