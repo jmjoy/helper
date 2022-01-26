@@ -8,23 +8,23 @@
 // FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use helper::hmap;
-use std::collections::HashMap;
+use helper::btmap;
+use std::collections::BTreeMap;
 
 #[test]
-pub fn test_hmap_0() {
-    let m: HashMap<(), ()> = HashMap::new();
-    assert_eq!(hmap! {}, m);
+pub fn test_btmap_0() {
+    let m: BTreeMap<(), ()> = BTreeMap::new();
+    assert_eq!(btmap! {}, m);
 }
 
 #[test]
-pub fn test_hmap_1() {
-    let mut m = HashMap::new();
+pub fn test_btmap_1() {
+    let mut m = BTreeMap::new();
     m.insert("key", "value");
     m.insert("key1", "value1");
 
     assert_eq!(
-        hmap! {
+        btmap! {
             "key": "value",
             "key1": "value1",
         },
@@ -32,7 +32,7 @@ pub fn test_hmap_1() {
     );
 
     assert_eq!(
-        hmap! {
+        btmap! {
             "key": "value",
             "key1": "value1"
         },
@@ -41,25 +41,25 @@ pub fn test_hmap_1() {
 }
 
 #[test]
-pub fn test_hmap_2() {
-    let mut m = HashMap::new();
+pub fn test_btmap_2() {
+    let mut m = BTreeMap::new();
     m.insert("key", {
-        let mut m = HashMap::new();
+        let mut m = BTreeMap::new();
         m.insert(1, true);
         m
     });
     m.insert("key1", {
-        let mut m = HashMap::new();
+        let mut m = BTreeMap::new();
         m.insert(2, false);
         m
     });
 
     assert_eq!(
-        hmap! {
-            "key": hmap! {
+        btmap! {
+            "key": btmap! {
                 1: true,
             },
-            "key1": hmap! {
+            "key1": btmap! {
                 2: false
             },
         },

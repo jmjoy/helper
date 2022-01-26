@@ -14,6 +14,7 @@ A library provided some useful proc macros for Rust.
 
 - **collections**
 
+  - [**btmap**](https://docs.rs/helper/latest/helper/macro.btmap.html): Create `std::collections::BTreeMap` from list of key-value pairs.
   - [**hmap**](https://docs.rs/helper/latest/helper/macro.hmap.html): Create `std::collections::HashMap` from list of key-value pairs.
 
 ## License

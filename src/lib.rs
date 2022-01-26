@@ -50,3 +50,21 @@ pub fn either(items: TokenStream) -> TokenStream {
 pub fn hmap(items: TokenStream) -> TokenStream {
     collections::hmap(items.into()).into()
 }
+
+/// Create [`std::collections::BTreeMap`] from list of key-value pairs.
+///
+/// # Example
+/// ```
+/// use helper::btmap;
+///
+/// let m = btmap! {
+///     "a": 1,
+///     "b": 2,
+/// };
+/// assert_eq!(m["a"], 1);
+/// assert_eq!(m["b"], 2);
+/// ```
+#[proc_macro]
+pub fn btmap(items: TokenStream) -> TokenStream {
+    collections::btmap(items.into()).into()
+}
