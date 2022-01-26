@@ -20,7 +20,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
     - name: Install rust nightly
-      run: rustup toolchain install nightly
+      run: rustup toolchain install nightly -c rustfmt
     - name: Build
       run: cargo build --verbose
     - name: Format
