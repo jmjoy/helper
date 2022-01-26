@@ -7,6 +7,8 @@ rust-version = "1.58"
 repository = "https://github.com/jmjoy/helper"
 description = "A library provided some useful proc macros for Rust."
 license = "MulanPSL-2.0"
+keywords = ["hashmap", "maplit", "macro"]
+categories = ["accessibility", "rust-patterns"]
 
 [lib]
 proc-macro = true
