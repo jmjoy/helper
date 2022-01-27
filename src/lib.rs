@@ -33,6 +33,40 @@ pub fn either(items: TokenStream) -> TokenStream {
     control::either(items.into()).into()
 }
 
+/// [`std::option::Option`] relative operations.
+///
+/// # Operations
+///
+/// ## unwrap .. or ..
+///
+/// `option!(unwrap .. or ..)` expand to `match .. { Some(x) => x, None => .. }`.
+///
+/// ### Example
+/// ```
+/// use helper::option;
+///
+/// // Like Option::unwrap_or.
+/// assert_eq!(option!(unwrap Some(true) or false), true);
+/// assert_eq!(option!(unwrap None or false), false);
+///
+/// // Return in advance.
+/// fn foo() -> bool {
+///     let x = option!(unwrap Some("foo") or return false);
+///     x == "foo"
+/// }
+/// assert!(foo());
+///
+/// // Break in advance.
+/// let x = loop {
+///     option!(unwrap None or break 1i32);
+/// };
+/// assert_eq!(x, 1);
+/// ```
+#[proc_macro]
+pub fn option(items: TokenStream) -> TokenStream {
+    control::option(items.into()).into()
+}
+
 /// Create [`std::collections::HashMap`] from list of key-value pairs.
 ///
 /// # Example

@@ -49,6 +49,61 @@ pub(crate) fn either(items: TokenStream) -> TokenStream {
         .unwrap()
 }
 
+enum OptionUnwrapFlag {
+    Option,
+    Or,
+}
+
+pub(crate) fn option(items: TokenStream) -> TokenStream {
+    let mut items = items.into_iter();
+    let first = items.next();
+
+    match first {
+        Some(first) => {
+            if let TokenTree::Ident(ref ident) = first {
+                match &*ident.to_string() {
+                    "unwrap" => {
+                        let mut option = TokenStream::new();
+                        let mut or = TokenStream::new();
+                        let mut flag = OptionUnwrapFlag::Option;
+
+                        for item in items {
+                            match item {
+                                TokenTree::Ident(ident) if ident == "or" => {
+                                    flag = OptionUnwrapFlag::Or;
+                                }
+                                _ => match flag {
+                                    OptionUnwrapFlag::Option => {
+                                        option.extend([item]);
+                                    }
+                                    OptionUnwrapFlag::Or => {
+                                        or.extend([item]);
+                                    }
+                                },
+                            }
+                        }
+
+                        format!(
+                            r#"
+                            match {option} {{
+                                Some(sth) => sth,
+                                None => {or},
+                            }}
+                        "#
+                        )
+                        .parse()
+                        .unwrap()
+                    }
+                    _ => panic!("unknown operation {first}"),
+                }
+            } else {
+                panic!("unknown operation {first}")
+            }
+        }
+        None => panic!("expr can't be empty"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::utils::{pm_test_left, pm_test_right};
@@ -60,6 +115,57 @@ mod tests {
         assert_eq!(
             pm_test_left(either, "1 > 2 ? true : false"),
             pm_test_right("if 1 > 2 { true } else { false }"),
+        );
+    }
+
+    #[test]
+    fn test_option() {
+        assert_eq!(
+            pm_test_left(option, "unwrap x or 1"),
+            pm_test_right(
+                r#"
+                match x {
+                    Some(sth) => sth,
+                    None => 1,
+                }
+            "#
+            ),
+        );
+
+        assert_eq!(
+            pm_test_left(option, "unwrap x or return false"),
+            pm_test_right(
+                r#"
+                match x {
+                    Some(sth) => sth,
+                    None => return false,
+                }
+            "#
+            ),
+        );
+
+        assert_eq!(
+            pm_test_left(option, "unwrap x or break"),
+            pm_test_right(
+                r#"
+                match x {
+                    Some(sth) => sth,
+                    None => break,
+                }
+            "#
+            ),
+        );
+
+        assert_eq!(
+            pm_test_left(option, "unwrap x or continue"),
+            pm_test_right(
+                r#"
+                match x {
+                    Some(sth) => sth,
+                    None => continue,
+                }
+            "#
+            ),
         );
     }
 }
