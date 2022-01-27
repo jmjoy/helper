@@ -20,7 +20,7 @@ use proc_macro::TokenStream;
 
 /// Ternary operator in many C-like languages.
 ///
-/// `either!(expr ? left : right)` will expand to `if expr { left } else { right }`.
+/// `either!(expr ? left : right)` expand to `if expr { left } else { right }`.
 ///
 /// # Example
 /// ```
@@ -101,4 +101,34 @@ pub fn hmap(items: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn btmap(items: TokenStream) -> TokenStream {
     collections::btmap(items.into()).into()
+}
+
+/// Create a [`std::collections::HashSet`] from a list of elements.
+///
+/// # Example
+/// ```
+/// use helper::hset;
+///
+/// let set = hset! {"a", "b"};
+/// assert!(set.contains("a"));
+/// assert!(set.contains("b"));
+/// ```
+#[proc_macro]
+pub fn hset(items: TokenStream) -> TokenStream {
+    collections::hset(items.into()).into()
+}
+
+/// Create a [`std::collections::BTreeSet`] from a list of elements.
+///
+/// # Example
+/// ```
+/// use helper::btset;
+///
+/// let set = btset! {"a", "b"};
+/// assert!(set.contains("a"));
+/// assert!(set.contains("b"));
+/// ```
+#[proc_macro]
+pub fn btset(items: TokenStream) -> TokenStream {
+    collections::btset(items.into()).into()
 }
