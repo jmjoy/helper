@@ -12,7 +12,6 @@ use proc_macro2::{TokenStream, TokenTree};
 
 #[derive(PartialEq)]
 enum MapFlag {
-    New,
     Key,
     Value,
 }
@@ -31,16 +30,11 @@ fn map(items: TokenStream, qualifier: &str, has_capacity: bool) -> TokenStream {
     }
 
     let mut len = 0usize;
-    let mut flag = MapFlag::New;
+    let mut flag = MapFlag::Key;
     let mut new_items = Vec::new();
     let mut tmp_item = (TokenStream::new(), TokenStream::new());
 
     for item in items {
-        if flag == MapFlag::New {
-            flag = MapFlag::Key;
-            len += 1;
-        }
-
         match item {
             TokenTree::Punct(p) if p.as_char() == ':' => {
                 flag = MapFlag::Value;
@@ -48,20 +42,23 @@ fn map(items: TokenStream, qualifier: &str, has_capacity: bool) -> TokenStream {
             TokenTree::Punct(p) if p.as_char() == ',' => {
                 new_items.push(tmp_item);
                 tmp_item = (TokenStream::new(), TokenStream::new());
-                flag = MapFlag::New;
+                flag = MapFlag::Key;
+                len += 1;
             }
-            _ => {
-                if flag == MapFlag::Key {
+            _ => match flag {
+                MapFlag::Key => {
                     tmp_item.0.extend([item]);
-                } else if flag == MapFlag::Value {
+                }
+                MapFlag::Value => {
                     tmp_item.1.extend([item]);
                 }
-            }
+            },
         }
     }
 
-    if flag != MapFlag::New {
+    if flag != MapFlag::Key {
         new_items.push(tmp_item);
+        len += 1;
     }
 
     let inserts = new_items
