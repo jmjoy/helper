@@ -8,15 +8,30 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-#[cfg(test)]
-use proc_macro2::TokenStream;
+use helper::try_option;
 
-#[cfg(test)]
-pub(crate) fn pm_test_left(f: impl FnOnce(TokenStream) -> TokenStream, s: &str) -> String {
-    f(s.parse().unwrap()).to_string()
+#[test]
+pub fn test_try_option_0() {
+    let x = (|| try_option!(Some(1) ? 2))();
+    assert_eq!(x, 1);
+
+    let x = (|| try_option!(None ? 2))();
+    assert_eq!(x, 2);
 }
 
-#[cfg(test)]
-pub(crate) fn pm_test_right(s: &str) -> String {
-    s.parse::<TokenStream>().unwrap().to_string()
+#[test]
+pub fn test_try_option_1() {
+    let mut b = false;
+    (|| {
+        try_option!(Some(1)?());
+        b = true;
+    })();
+    assert_eq!(b, true);
+
+    let mut b = false;
+    (|| {
+        let _ = try_option!(None::<()>?());
+        b = true;
+    })();
+    assert_eq!(b, false);
 }
