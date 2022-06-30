@@ -104,6 +104,37 @@ pub(crate) fn option(items: TokenStream) -> TokenStream {
     }
 }
 
+pub(crate) fn try_option(items: TokenStream) -> TokenStream {
+    let mut option = TokenStream::new();
+    let mut or = TokenStream::new();
+
+    let mut is_or = false;
+
+    for item in items {
+        match item {
+            TokenTree::Punct(p) if p.as_char() == '?' => is_or = true,
+            _ => {
+                if is_or {
+                    or.extend([item]);
+                } else {
+                    option.extend([item])
+                }
+            }
+        }
+    }
+
+    format!(
+        r#"
+        match {option} {{
+            Some(sth) => sth,
+            None => return {or},
+        }}
+    "#
+    )
+    .parse()
+    .unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::utils::{pm_test_left, pm_test_right};
@@ -163,6 +194,21 @@ mod tests {
                 match x {
                     Some(sth) => sth,
                     None => continue,
+                }
+            "#
+            ),
+        );
+    }
+
+    #[test]
+    fn test_try_option() {
+        assert_eq!(
+            pm_test_left(try_option, "x ? 1"),
+            pm_test_right(
+                r#"
+                match x {
+                    Some(sth) => sth,
+                    None => return 1,
                 }
             "#
             ),

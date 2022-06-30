@@ -67,6 +67,25 @@ pub fn option(items: TokenStream) -> TokenStream {
     control::option(items.into()).into()
 }
 
+/// Unwrap [`std::option::Option`], if none, return the alternative value.
+///
+/// `try_option!(.. ? ..)` expand to `match .. { Some(x) => x, None => return .. }`.
+///
+/// ### Example
+/// ```
+/// use helper::try_option;
+///
+/// fn foo() -> bool {
+///     let x = try_option!(Some("foo") ? false);
+///     x == "foo"
+/// }
+/// assert!(foo());
+/// ```
+#[proc_macro]
+pub fn try_option(items: TokenStream) -> TokenStream {
+    control::try_option(items.into()).into()
+}
+
 /// Create [`std::collections::HashMap`] from list of key-value pairs.
 ///
 /// # Example
