@@ -123,6 +123,10 @@ pub(crate) fn try_option(items: TokenStream) -> TokenStream {
         }
     }
 
+    if or.is_empty() {
+        or = "()".parse().unwrap();
+    }
+
     format!(
         r#"
         match {option} {{
@@ -202,6 +206,18 @@ mod tests {
 
     #[test]
     fn test_try_option() {
+        assert_eq!(
+            pm_test_left(try_option, "x"),
+            pm_test_right(
+                r#"
+                match x {
+                    Some(sth) => sth,
+                    None => return (),
+                }
+            "#
+            ),
+        );
+
         assert_eq!(
             pm_test_left(try_option, "x ? 1"),
             pm_test_right(

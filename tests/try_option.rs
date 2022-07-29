@@ -35,3 +35,20 @@ pub fn test_try_option_1() {
     })();
     assert_eq!(b, false);
 }
+
+#[test]
+pub fn test_try_option_2() {
+    let mut b = false;
+    (|| {
+        try_option!(Some(1));
+        b = true;
+    })();
+    assert_eq!(b, true);
+
+    let mut b = false;
+    (|| {
+        let _ = try_option!(None::<()>);
+        b = true;
+    })();
+    assert_eq!(b, false);
+}

@@ -71,6 +71,8 @@ pub fn option(items: TokenStream) -> TokenStream {
 
 /// Unwrap [`std::option::Option`], if none, return the alternative value.
 ///
+/// `try_option!(..)` expand to `match .. { Some(x) => x, None => return, }`.
+///
 /// `try_option!(.. ? ..)` expand to `match .. { Some(x) => x, None => return ..
 /// }`.
 ///
@@ -78,11 +80,19 @@ pub fn option(items: TokenStream) -> TokenStream {
 /// ```
 /// use helper::try_option;
 ///
-/// fn foo() -> bool {
-///     let x = try_option!(Some("foo") ? false);
-///     x == "foo"
+/// fn foo(b: &mut bool) {
+///     try_option!(Some(()));
+///     *b = true
 /// }
-/// assert!(foo());
+/// let mut b = false;
+/// foo(&mut b);
+/// assert!(b);
+///
+/// fn bar() -> bool {
+///     let x = try_option!(Some("bar") ? false);
+///     x == "bar"
+/// }
+/// assert!(bar());
 /// ```
 #[proc_macro]
 pub fn try_option(items: TokenStream) -> TokenStream {

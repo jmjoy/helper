@@ -8,6 +8,8 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
+#![allow(deprecated)]
+
 use helper::option;
 
 #[test]
