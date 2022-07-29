@@ -11,7 +11,6 @@ A library provided some useful proc macros for Rust.
 - **control flow**
 
   - [**either**](https://docs.rs/helper/latest/helper/macro.either.html): Ternary operator in many C-like languages.
-  - [**option**](https://docs.rs/helper/latest/helper/macro.option.html): `std::option::Option` relative operations.
   - [**try_option**](https://docs.rs/helper/latest/helper/macro.try_option.html): Unwrap `std::option::Option`, if none, return the alternative value.
 
 - **collections**

@@ -33,7 +33,7 @@ pub fn either(items: TokenStream) -> TokenStream {
     control::either(items.into()).into()
 }
 
-/// [`std::option::Option`] relative operations.
+/// The [`std::option::Option`] relative operations.
 ///
 /// # Operations
 ///
@@ -64,6 +64,7 @@ pub fn either(items: TokenStream) -> TokenStream {
 /// assert_eq!(x, 1);
 /// ```
 #[proc_macro]
+#[deprecated = "For `unwrap` operation, use `try_option` instead."]
 pub fn option(items: TokenStream) -> TokenStream {
     control::option(items.into()).into()
 }
