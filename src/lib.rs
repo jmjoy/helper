@@ -94,6 +94,7 @@ pub fn option(items: TokenStream) -> TokenStream {
 /// }
 /// assert!(bar());
 /// ```
+#[deprecated = "Using let-else` instead."]
 #[proc_macro]
 pub fn try_option(items: TokenStream) -> TokenStream {
     control::try_option(items.into()).into()
