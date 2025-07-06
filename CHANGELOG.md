@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.3.1](https://github.com/jmjoy/helper/compare/v3.3.0...v3.3.1) - 2025-07-06
+## [4.0.0](https://github.com/jmjoy/helper/compare/v3.3.0...v4.0.0) - 2025-07-06
 
 ### Other
 
