@@ -19,15 +19,51 @@ pub(crate) mod utils;
 
 use proc_macro::TokenStream;
 
-/// Ternary operator in many C-like languages.
+/// Select between two expressions using a boolean condition.
 ///
-/// `either!(expr ? left : right)` expand to `if expr { left } else { right }`.
+/// `either!(condition, left, right)` evaluates the condition once and evaluates
+/// only the selected branch, just like `if condition { left } else { right }`.
+/// All three arguments are Rust expressions, including expressions using `?`.
+/// A trailing comma is allowed.
 ///
 /// # Example
 /// ```
 /// use helper::either;
 ///
-/// assert_eq!(either!(1 > 2 ? "1" : "2"), "2");
+/// assert_eq!(either!(1 > 2, "1", "2"), "2");
+/// assert_eq!(either!(true, std::cmp::max(1, 2), 0,), 2);
+/// ```
+///
+/// Error propagation works in the condition and both branches:
+/// ```
+/// use helper::either;
+///
+/// fn select(
+///     condition: Result<bool, &'static str>, left: Result<i32, &'static str>,
+///     right: Result<i32, &'static str>,
+/// ) -> Result<i32, &'static str> {
+///     Ok(either!(condition?, left?, right?))
+/// }
+///
+/// assert_eq!(select(Ok(true), Ok(7), Err("unselected")), Ok(7));
+/// assert_eq!(select(Ok(false), Ok(7), Err("selected")), Err("selected"));
+/// ```
+///
+/// Exactly three comma-separated expressions are required:
+/// ```compile_fail
+/// helper::either!();
+/// ```
+/// ```compile_fail
+/// helper::either!(true, 1);
+/// ```
+/// ```compile_fail
+/// helper::either!(true, 1, 2, 3);
+/// ```
+/// ```compile_fail
+/// helper::either!(true, 1 +, 2);
+/// ```
+/// ```compile_fail
+/// helper::either!(true ? 1 : 2);
 /// ```
 #[proc_macro]
 pub fn either(items: TokenStream) -> TokenStream {
