@@ -10,7 +10,7 @@ A library provided some useful proc macros for Rust.
 
 - **control flow**
 
-  - [**either**](https://docs.rs/helper/latest/helper/macro.either.html): Ternary operator in many C-like languages.
+  - [**either**](https://docs.rs/helper/latest/helper/macro.either.html): Select between two expressions with `either!(condition, left, right)`.
 
 - **collections**
 
@@ -39,6 +39,20 @@ A library provided some useful proc macros for Rust.
   - [**bool**](https://docs.rs/helper/latest/helper/macro.bool.html): Convert expression to `bool` type.
 
 ## Examples
+
+### Conditional Selection
+
+```rust
+use helper::either;
+
+let condition = true;
+let value = either!(condition, std::cmp::max(1, 2), 0,);
+assert_eq!(value, 2);
+```
+
+The condition is evaluated once, and only the selected branch is evaluated.
+All three arguments are Rust expressions and support the `?` operator.
+A trailing comma is optional.
 
 ### Type Conversion
 

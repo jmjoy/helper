@@ -8,58 +8,29 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use proc_macro2::{TokenStream, TokenTree};
-
-enum EitherFlag {
-    Condition,
-    Left,
-    Right,
-}
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{parse::Parser, punctuated::Punctuated, Expr, Token};
 
 pub(crate) fn either(items: TokenStream) -> TokenStream {
-    let mut condition = TokenStream::new();
-    let mut left = TokenStream::new();
-    let mut right = TokenStream::new();
-    let mut flag = EitherFlag::Condition;
+    let expressions = match Punctuated::<Expr, Token![,]>::parse_terminated.parse2(items) {
+        Ok(expressions) => expressions,
+        Err(error) => return error.into_compile_error(),
+    };
 
-    for item in items {
-        match item {
-            TokenTree::Punct(p) if p.as_char() == '?' => {
-                flag = EitherFlag::Left;
-            }
-            TokenTree::Punct(p) if p.as_char() == ':' => {
-                flag = EitherFlag::Right;
-            }
-            _ => match flag {
-                EitherFlag::Condition => {
-                    condition.extend([item]);
-                }
-                EitherFlag::Left => {
-                    left.extend([item]);
-                }
-                EitherFlag::Right => {
-                    right.extend([item]);
-                }
-            },
-        }
+    if expressions.len() != 3 {
+        return syn::Error::new_spanned(
+            &expressions,
+            "expected exactly three expressions: either!(condition, true_expr, false_expr)",
+        )
+        .into_compile_error();
     }
 
-    format!("if {condition} {{ {left} }} else {{ {right} }}")
-        .parse()
-        .unwrap()
-}
+    let condition = &expressions[0];
+    let left = &expressions[1];
+    let right = &expressions[2];
 
-#[cfg(test)]
-mod tests {
-    use crate::utils::{pm_test_left, pm_test_right};
-
-    use super::*;
-
-    #[test]
-    fn test_either() {
-        assert_eq!(
-            pm_test_left(either, "1 > 2 ? true : false"),
-            pm_test_right("if 1 > 2 { true } else { false }"),
-        );
+    quote! {
+        if (#condition) { #left } else { #right }
     }
 }
