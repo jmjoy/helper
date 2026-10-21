@@ -8,142 +8,100 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::quote;
+use syn::{
+    parse::{Parse, ParseStream, Parser},
+    punctuated::Punctuated,
+    Expr, Result, Token,
+};
+
+use crate::utils::parse_expr;
 
 pub(crate) fn hmap(items: TokenStream) -> TokenStream {
-    map(items, "::std::collections::HashMap", true)
+    map(items, quote!(::std::collections::HashMap), true)
 }
 
 pub(crate) fn btmap(items: TokenStream) -> TokenStream {
-    map(items, "::std::collections::BTreeMap", false)
+    map(items, quote!(::std::collections::BTreeMap), false)
 }
 
-#[derive(PartialEq)]
-enum MapFlag {
-    Key,
-    Value,
+struct MapEntry {
+    key: Expr,
+    value: Expr,
 }
 
-fn map(items: TokenStream, qualifier: &str, has_capacity: bool) -> TokenStream {
-    if items.is_empty() {
-        return format!("{qualifier}::new()").parse().unwrap();
+impl Parse for MapEntry {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        let key = parse_expr(input)?;
+        input.parse::<Token![:]>()?;
+        let value = parse_expr(input)?;
+        Ok(Self { key, value })
     }
+}
 
-    let mut len = 0usize;
-    let mut flag = MapFlag::Key;
-    let mut new_items = Vec::new();
-    let mut tmp_item = (TokenStream::new(), TokenStream::new());
-
-    for item in items {
-        match item {
-            TokenTree::Punct(p) if p.as_char() == ':' => {
-                flag = MapFlag::Value;
-            }
-            TokenTree::Punct(p) if p.as_char() == ',' => {
-                new_items.push(tmp_item);
-                tmp_item = (TokenStream::new(), TokenStream::new());
-                flag = MapFlag::Key;
-                len += 1;
-            }
-            _ => match flag {
-                MapFlag::Key => {
-                    tmp_item.0.extend([item]);
-                }
-                MapFlag::Value => {
-                    tmp_item.1.extend([item]);
-                }
-            },
-        }
-    }
-
-    if flag != MapFlag::Key {
-        new_items.push(tmp_item);
-        len += 1;
-    }
-
-    let inserts = new_items
-        .into_iter()
-        .map(|(key, value)| format!("let _ = map.insert({key}, {value});"))
-        .collect::<Vec<_>>();
-    let inserts = inserts.join("\n");
-
-    let cap_construct = if has_capacity {
-        format!("with_capacity({len})")
-    } else {
-        "new()".to_string()
+fn map(items: TokenStream, qualifier: TokenStream, has_capacity: bool) -> TokenStream {
+    let entries = match Punctuated::<MapEntry, Token![,]>::parse_terminated.parse2(items) {
+        Ok(entries) => entries,
+        Err(error) => return error.into_compile_error(),
     };
+    let constructor = constructor(&qualifier, entries.len(), has_capacity);
 
-    let block = format!(
-        r#"
-        {{
-            let mut map = {qualifier}::{cap_construct};
-            {inserts}
-            map
-        }}
-    "#
-    );
+    if entries.is_empty() {
+        return constructor;
+    }
 
-    block.parse().unwrap()
+    // Keep the generated binding separate from identifiers in user expressions.
+    let map = Ident::new("map", Span::mixed_site());
+    let inserts = entries.iter().map(|MapEntry { key, value }| {
+        quote! { let _ = #map.insert(#key, #value); }
+    });
+
+    quote! {{
+        let mut #map = #constructor;
+        #(#inserts)*
+        #map
+    }}
 }
 
 pub(crate) fn hset(items: TokenStream) -> TokenStream {
-    seq(items, "::std::collections::HashSet", true)
+    seq(items, quote!(::std::collections::HashSet), true)
 }
 
 pub(crate) fn btset(items: TokenStream) -> TokenStream {
-    seq(items, "::std::collections::BTreeSet", false)
+    seq(items, quote!(::std::collections::BTreeSet), false)
 }
 
-fn seq(items: TokenStream, qualifier: &str, has_capacity: bool) -> TokenStream {
-    if items.is_empty() {
-        return format!("{qualifier}::new()").parse().unwrap();
-    }
-
-    let mut new_items = Vec::new();
-    let mut new_item = TokenStream::new();
-    let mut len = 0;
-
-    for item in items {
-        match item {
-            TokenTree::Punct(p) if p.as_char() == ',' => {
-                new_items.push(new_item);
-                new_item = TokenStream::new();
-                len += 1;
-            }
-            _ => {
-                new_item.extend([item]);
-            }
-        }
-    }
-
-    if !new_item.is_empty() {
-        new_items.push(new_item);
-        len += 1;
-    }
-
-    let inserts = new_items
-        .into_iter()
-        .map(|item| format!("let _ = seq.insert({item});"))
-        .collect::<Vec<_>>();
-    let inserts = inserts.join("\n");
-
-    let cap_construct = if has_capacity {
-        format!("with_capacity({len})")
-    } else {
-        "new()".to_string()
+fn seq(items: TokenStream, qualifier: TokenStream, has_capacity: bool) -> TokenStream {
+    let parser = |input: ParseStream<'_>| {
+        Punctuated::<Expr, Token![,]>::parse_terminated_with(input, parse_expr)
     };
+    let elements = match parser.parse2(items) {
+        Ok(elements) => elements,
+        Err(error) => return error.into_compile_error(),
+    };
+    let constructor = constructor(&qualifier, elements.len(), has_capacity);
 
-    let block = format!(
-        r#"
-        {{
-            let mut seq = {qualifier}::{cap_construct};
-            {inserts}
-            seq
-        }}
-    "#
-    );
+    if elements.is_empty() {
+        return constructor;
+    }
 
-    block.parse().unwrap()
+    let seq = Ident::new("seq", Span::mixed_site());
+    let elements = elements.iter();
+
+    quote! {{
+        let mut #seq = #constructor;
+        #(let _ = #seq.insert(#elements);)*
+        #seq
+    }}
+}
+
+fn constructor(qualifier: &TokenStream, len: usize, has_capacity: bool) -> TokenStream {
+    if has_capacity && len > 0 {
+        quote!(#qualifier::with_capacity(#len))
+    } else {
+        quote!(#qualifier::new())
+    }
 }
 
 #[cfg(test)]
@@ -170,7 +128,7 @@ mod tests {
             pm_test_right(
                 r#"
                 {
-                    let mut map = ::std::collections::HashMap::with_capacity(2);
+                    let mut map = ::std::collections::HashMap::with_capacity(2usize);
                     let _ = map.insert("key", "value");
                     let _ = map.insert("key1", "value1");
                     map
@@ -190,7 +148,7 @@ mod tests {
             pm_test_right(
                 r#"
                 {
-                    let mut map = ::std::collections::HashMap::with_capacity(2);
+                    let mut map = ::std::collections::HashMap::with_capacity(2usize);
                     let _ = map.insert("key", "value");
                     let _ = map.insert("key1", "value1");
                     map
@@ -266,7 +224,7 @@ mod tests {
             pm_test_right(
                 r#"
                 {
-                    let mut seq = ::std::collections::HashSet::with_capacity(2);
+                    let mut seq = ::std::collections::HashSet::with_capacity(2usize);
                     let _ = seq.insert("value");
                     let _ = seq.insert("value1");
                     seq
@@ -285,7 +243,7 @@ mod tests {
             pm_test_right(
                 r#"
                 {
-                    let mut seq = ::std::collections::HashSet::with_capacity(2);
+                    let mut seq = ::std::collections::HashSet::with_capacity(2usize);
                     let _ = seq.insert("value");
                     let _ = seq.insert("value1");
                     seq

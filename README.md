@@ -74,6 +74,10 @@ let ascii_value = 65u8;
 let character = char!(ascii_value);  // 'A'
 ```
 
+Each conversion accepts one Rust expression and follows Rust's `as` cast rules,
+including truncation when narrowing integers. The target is always the named
+primitive type, even if a type alias with that name is in scope.
+
 ### Collections
 
 ```rust
@@ -97,6 +101,26 @@ let btree_map = btmap! {
 // BTreeSet
 let btree_set = btset! { 1, 2, 3 };
 ```
+
+Map keys and values and set elements are Rust expressions. Paths (`u8::MAX`),
+generic arguments (`Result::<u16, u32>::Ok(1)`), closures, and `?` are parsed as
+part of the expression. Maps keep the `key: value` syntax:
+
+```rust
+let limits = helper::hmap! {
+    u8::MAX: Result::<u16, u32>::Ok(u16::MAX),
+};
+assert_eq!(limits[&u8::MAX], Ok(u16::MAX));
+
+let operations = helper::btmap! {"add": |a: i32, b: i32| a + b};
+assert_eq!(operations["add"](2, 3), 5);
+```
+
+Expressions are evaluated once in input order. Later map entries with duplicate
+keys replace earlier values, and sets deduplicate elements. Empty collections
+and trailing commas are supported; missing keys, values, or elements produce
+compile errors. All macros preserve variable bindings and expression precedence
+when called from `macro_rules!` wrappers.
 
 ## License
 

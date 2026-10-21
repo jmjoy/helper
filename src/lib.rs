@@ -83,6 +83,25 @@ pub fn either(items: TokenStream) -> TokenStream {
 /// assert_eq!(m["a"], 1);
 /// assert_eq!(m["b"], 2);
 /// ```
+///
+/// Keys and values are Rust expressions, including paths, generic arguments,
+/// closures, and the `?` operator. Each key and value is evaluated once, in
+/// input order. A later duplicate key replaces the earlier value.
+/// ```
+/// let limits = helper::hmap! {u8::MAX: Result::<u16, u32>::Ok(u16::MAX)};
+/// assert_eq!(limits[&u8::MAX], Ok(u16::MAX));
+/// ```
+///
+/// Every entry requires both a key and a value:
+/// ```compile_fail
+/// let _ = helper::hmap! {"a": 1, "b"};
+/// ```
+/// ```compile_fail
+/// let _ = helper::hmap! {"a":};
+/// ```
+/// ```compile_fail
+/// let _ = helper::hmap! {"a": 1 "b": 2};
+/// ```
 #[proc_macro]
 pub fn hmap(items: TokenStream) -> TokenStream {
     collections::hmap(items.into()).into()
@@ -101,6 +120,20 @@ pub fn hmap(items: TokenStream) -> TokenStream {
 /// assert_eq!(m["a"], 1);
 /// assert_eq!(m["b"], 2);
 /// ```
+///
+/// Keys and values are Rust expressions. Each key and value is evaluated once,
+/// in input order. A later duplicate key replaces the earlier value.
+///
+/// Every entry requires both a key and a value:
+/// ```compile_fail
+/// let _ = helper::btmap! {"a": 1, "b"};
+/// ```
+/// ```compile_fail
+/// let _ = helper::btmap! {"a":};
+/// ```
+/// ```compile_fail
+/// let _ = helper::btmap! {"a": 1,, "b": 2};
+/// ```
 #[proc_macro]
 pub fn btmap(items: TokenStream) -> TokenStream {
     collections::btmap(items.into()).into()
@@ -116,6 +149,12 @@ pub fn btmap(items: TokenStream) -> TokenStream {
 /// assert!(set.contains("a"));
 /// assert!(set.contains("b"));
 /// ```
+///
+/// Elements are Rust expressions and are evaluated once, in input order.
+/// A trailing comma is allowed; empty elements are rejected:
+/// ```compile_fail
+/// let _ = helper::hset! {1,, 2};
+/// ```
 #[proc_macro]
 pub fn hset(items: TokenStream) -> TokenStream {
     collections::hset(items.into()).into()
@@ -130,6 +169,12 @@ pub fn hset(items: TokenStream) -> TokenStream {
 /// let set = btset! {"a", "b"};
 /// assert!(set.contains("a"));
 /// assert!(set.contains("b"));
+/// ```
+///
+/// Elements are Rust expressions and are evaluated once, in input order.
+/// A trailing comma is allowed; empty elements are rejected:
+/// ```compile_fail
+/// let _ = helper::btset! {,1};
 /// ```
 #[proc_macro]
 pub fn btset(items: TokenStream) -> TokenStream {
@@ -147,6 +192,14 @@ pub fn btset(items: TokenStream) -> TokenStream {
 /// let x = 42i32;
 /// let y = u8!(x);
 /// assert_eq!(y, 42u8);
+/// ```
+///
+/// Exactly one Rust expression is required:
+/// ```compile_fail
+/// let _ = helper::u8!();
+/// ```
+/// ```compile_fail
+/// let _ = helper::u8!(1, 2);
 /// ```
 #[proc_macro]
 pub fn u8(items: TokenStream) -> TokenStream {
@@ -324,9 +377,9 @@ pub fn isize(items: TokenStream) -> TokenStream {
 /// ```
 /// use helper::f32;
 ///
-/// let x = 3.14f64;
+/// let x = 13.25f64;
 /// let y = f32!(x);
-/// assert_eq!(y, 3.14f32);
+/// assert_eq!(y, 13.25f32);
 /// ```
 #[proc_macro]
 pub fn f32(items: TokenStream) -> TokenStream {
@@ -339,9 +392,9 @@ pub fn f32(items: TokenStream) -> TokenStream {
 /// ```
 /// use helper::f64;
 ///
-/// let x = 3.14f32;
+/// let x = 13.25f32;
 /// let y = f64!(x);
-/// assert!((y - 3.14f64).abs() < 0.0001);
+/// assert_eq!(y, 13.25f64);
 /// ```
 #[proc_macro]
 pub fn f64(items: TokenStream) -> TokenStream {

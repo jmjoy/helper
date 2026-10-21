@@ -10,10 +10,19 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse::Parser, punctuated::Punctuated, Expr, Token};
+use syn::{
+    parse::{ParseStream, Parser},
+    punctuated::Punctuated,
+    Expr, Token,
+};
+
+use crate::utils::parse_expr;
 
 pub(crate) fn either(items: TokenStream) -> TokenStream {
-    let expressions = match Punctuated::<Expr, Token![,]>::parse_terminated.parse2(items) {
+    let parser = |input: ParseStream<'_>| {
+        Punctuated::<Expr, Token![,]>::parse_terminated_with(input, parse_expr)
+    };
+    let expressions = match parser.parse2(items) {
         Ok(expressions) => expressions,
         Err(error) => return error.into_compile_error(),
     };

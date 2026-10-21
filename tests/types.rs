@@ -86,17 +86,16 @@ fn test_isize_conversion() {
 
 #[test]
 fn test_f32_conversion() {
-    let x = 3.14f64;
+    let x = 13.25f64;
     let y = f32!(x);
-    assert!((y - 3.14f32).abs() < f32::EPSILON);
+    assert!((y - 13.25f32).abs() < f32::EPSILON);
 }
 
 #[test]
 fn test_f64_conversion() {
-    let x = 3.14f32;
+    let x = 13.25f32;
     let y = f64!(x);
-    // Use a larger tolerance for f32 to f64 conversion
-    assert!((y - 3.14f64).abs() < 0.0001);
+    assert!((y - 13.25f64).abs() < f64::EPSILON);
 }
 
 #[test]
@@ -124,4 +123,30 @@ fn test_chained_conversions() {
     let x = 42i32;
     let y = f64!(i64!(u32!(x)));
     assert!((y - 42.0f64).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_bool_conversion() {
+    assert!(bool!(true));
+    assert!(!bool!(false));
+}
+
+#[test]
+fn test_expression_is_evaluated_once() {
+    let mut calls = 0;
+    let value = u8!({
+        calls += 1;
+        42
+    });
+
+    assert_eq!(value, 42);
+    assert_eq!(calls, 1);
+}
+
+#[test]
+fn test_cast_in_const_and_expression_contexts() {
+    const VALUE: u8 = helper::u8!(256u16 + 1);
+    assert_eq!(VALUE, 1);
+    assert_eq!(helper::u8!(40 + 2).to_string(), "42");
+    assert_eq!(helper::i32!(-2.5f64), -2);
 }

@@ -19,11 +19,11 @@ fn main() {
     println!("  isize: {}", isize!(x));
 
     // Float conversions
-    let y = 3.14f32;
+    let y = 13.25f32;
     println!("\nConverting {} from f32 to:", y);
     println!("  f64: {}", f64!(y));
 
-    let z = 2.718f64;
+    let z = 6.5f64;
     println!("\nConverting {} from f64 to:", z);
     println!("  f32: {}", f32!(z));
 
