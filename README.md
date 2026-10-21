@@ -12,6 +12,10 @@ A library provided some useful proc macros for Rust.
 
   - [**either**](https://docs.rs/helper/latest/helper/macro.either.html): Select between two expressions with `either!(condition, left, right)`.
 
+- **file inclusion**
+
+  - [**include_c_str**](https://docs.rs/helper/latest/helper/macro.include_c_str.html): Include a file as a `&'static core::ffi::CStr`, validating NUL bytes at compile time.
+
 - **collections**
 
   - [**btmap**](https://docs.rs/helper/latest/helper/macro.btmap.html): Create `std::collections::BTreeMap` from list of key-value pairs.
@@ -54,6 +58,29 @@ The condition is evaluated once, and only the selected branch is evaluated.
 All three arguments are Rust expressions and support the `?` operator.
 A trailing comma is optional.
 
+### C String Inclusion
+
+```rust
+use helper::include_c_str;
+
+const MANIFEST: &core::ffi::CStr = include_c_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/Cargo.toml",
+));
+assert!(MANIFEST.to_bytes().starts_with(b"[package]"));
+```
+
+Paths are relative to the file containing the invocation, just like
+`include_bytes!`. String literals, macros such as `concat!` and `env!`, and an
+optional trailing comma are supported. File changes trigger recompilation.
+A missing NUL terminator is appended, and an existing single terminator is
+preserved. Interior NUL bytes, including repeated trailing NULs, cause a compile
+error. Empty files and non-UTF-8 bytes are supported.
+
+The result works in `const` and `static` initializers and in `no_std` crates.
+Copying and validation happen at compile time, with no runtime allocation or
+unsafe code. Requires Rust 1.72 or later.
+
 ### Type Conversion
 
 ```rust
@@ -73,6 +100,10 @@ let chained = f64!(i64!(u32!(x)));
 let ascii_value = 65u8;
 let character = char!(ascii_value);  // 'A'
 ```
+
+Each conversion accepts one Rust expression and follows Rust's `as` cast rules,
+including truncation when narrowing integers. The target is always the named
+primitive type, even if a type alias with that name is in scope.
 
 ### Collections
 
@@ -97,6 +128,26 @@ let btree_map = btmap! {
 // BTreeSet
 let btree_set = btset! { 1, 2, 3 };
 ```
+
+Map keys and values and set elements are Rust expressions. Paths (`u8::MAX`),
+generic arguments (`Result::<u16, u32>::Ok(1)`), closures, and `?` are parsed as
+part of the expression. Maps keep the `key: value` syntax:
+
+```rust
+let limits = helper::hmap! {
+    u8::MAX: Result::<u16, u32>::Ok(u16::MAX),
+};
+assert_eq!(limits[&u8::MAX], Ok(u16::MAX));
+
+let operations = helper::btmap! {"add": |a: i32, b: i32| a + b};
+assert_eq!(operations["add"](2, 3), 5);
+```
+
+Expressions are evaluated once in input order. Later map entries with duplicate
+keys replace earlier values, and sets deduplicate elements. Empty collections
+and trailing commas are supported; missing keys, values, or elements produce
+compile errors. All macros preserve variable bindings and expression precedence
+when called from `macro_rules!` wrappers.
 
 ## License
 

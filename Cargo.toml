@@ -3,7 +3,7 @@ name = "helper"
 version = "4.0.0"
 authors = ["jmjoy <jmjoy@apache.org>"]
 edition = "2021"
-rust-version = "1.58"
+rust-version = "1.72"
 repository = "https://github.com/jmjoy/helper"
 description = "A library provided some useful proc macros for Rust."
 license = "MulanPSL-2.0"
@@ -16,4 +16,4 @@ proc-macro = true
 [dependencies]
 proc-macro2 = "1.0.36"
 quote = "1.0"
-syn = { version = "2.0", features = ["full"] }
+syn = { version = "2.0", features = ["fold", "full"] }

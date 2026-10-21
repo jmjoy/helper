@@ -14,6 +14,7 @@
 
 pub(crate) mod collections;
 pub(crate) mod control;
+pub(crate) mod strings;
 pub(crate) mod types;
 pub(crate) mod utils;
 
@@ -70,6 +71,67 @@ pub fn either(items: TokenStream) -> TokenStream {
     control::either(items.into()).into()
 }
 
+/// Include a file as a [`&'static CStr`](core::ffi::CStr).
+///
+/// The path is resolved relative to the file containing the invocation, just
+/// like [`include_bytes!`]. It must be a string literal or a macro expanding to
+/// one, such as `concat!(env!("CARGO_MANIFEST_DIR"), "/file.txt")`. A trailing
+/// comma is allowed.
+///
+/// A missing NUL terminator is appended; an existing single terminator is
+/// preserved. Any other NUL byte causes a compile error, even when the macro is
+/// used outside a `const` or `static`. Empty files and non-UTF-8 bytes are
+/// allowed. File changes are tracked by the compiler as with `include_bytes!`.
+///
+/// The result can be used in `const` and `static` initializers. The expansion
+/// uses only `core`, performs all copying and validation at compile time, and
+/// requires no allocation or unsafe code. Requires Rust 1.72 or later.
+///
+/// # Example
+/// ```
+/// use helper::include_c_str;
+///
+/// const MANIFEST: &core::ffi::CStr =
+///     include_c_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml",));
+/// assert_eq!(MANIFEST.to_bytes(), include_bytes!("../Cargo.toml"));
+/// ```
+///
+/// Interior NUL bytes are rejected during compilation:
+/// ```compile_fail
+/// let _ = helper::include_c_str!(concat!(
+///     env!("CARGO_MANIFEST_DIR"),
+///     "/tests/fixtures/include_c_str/interior_nul.bin",
+/// ));
+/// ```
+/// Leading NUL bytes and repeated terminators are also rejected:
+/// ```compile_fail
+/// let _ = helper::include_c_str!(concat!(
+///     env!("CARGO_MANIFEST_DIR"),
+///     "/tests/fixtures/include_c_str/leading_nul.bin",
+/// ));
+/// ```
+/// ```compile_fail
+/// let _ = helper::include_c_str!(concat!(
+///     env!("CARGO_MANIFEST_DIR"),
+///     "/tests/fixtures/include_c_str/repeated_nul.bin",
+/// ));
+/// ```
+///
+/// Exactly one path is required:
+/// ```compile_fail
+/// let _ = helper::include_c_str!();
+/// ```
+/// ```compile_fail
+/// let _ = helper::include_c_str!("first.txt", "second.txt");
+/// ```
+/// ```compile_fail
+/// let _ = helper::include_c_str!(123);
+/// ```
+#[proc_macro]
+pub fn include_c_str(items: TokenStream) -> TokenStream {
+    strings::include_c_str(items.into()).into()
+}
+
 /// Create [`std::collections::HashMap`] from list of key-value pairs.
 ///
 /// # Example
@@ -82,6 +144,25 @@ pub fn either(items: TokenStream) -> TokenStream {
 /// };
 /// assert_eq!(m["a"], 1);
 /// assert_eq!(m["b"], 2);
+/// ```
+///
+/// Keys and values are Rust expressions, including paths, generic arguments,
+/// closures, and the `?` operator. Each key and value is evaluated once, in
+/// input order. A later duplicate key replaces the earlier value.
+/// ```
+/// let limits = helper::hmap! {u8::MAX: Result::<u16, u32>::Ok(u16::MAX)};
+/// assert_eq!(limits[&u8::MAX], Ok(u16::MAX));
+/// ```
+///
+/// Every entry requires both a key and a value:
+/// ```compile_fail
+/// let _ = helper::hmap! {"a": 1, "b"};
+/// ```
+/// ```compile_fail
+/// let _ = helper::hmap! {"a":};
+/// ```
+/// ```compile_fail
+/// let _ = helper::hmap! {"a": 1 "b": 2};
 /// ```
 #[proc_macro]
 pub fn hmap(items: TokenStream) -> TokenStream {
@@ -101,6 +182,20 @@ pub fn hmap(items: TokenStream) -> TokenStream {
 /// assert_eq!(m["a"], 1);
 /// assert_eq!(m["b"], 2);
 /// ```
+///
+/// Keys and values are Rust expressions. Each key and value is evaluated once,
+/// in input order. A later duplicate key replaces the earlier value.
+///
+/// Every entry requires both a key and a value:
+/// ```compile_fail
+/// let _ = helper::btmap! {"a": 1, "b"};
+/// ```
+/// ```compile_fail
+/// let _ = helper::btmap! {"a":};
+/// ```
+/// ```compile_fail
+/// let _ = helper::btmap! {"a": 1,, "b": 2};
+/// ```
 #[proc_macro]
 pub fn btmap(items: TokenStream) -> TokenStream {
     collections::btmap(items.into()).into()
@@ -116,6 +211,12 @@ pub fn btmap(items: TokenStream) -> TokenStream {
 /// assert!(set.contains("a"));
 /// assert!(set.contains("b"));
 /// ```
+///
+/// Elements are Rust expressions and are evaluated once, in input order.
+/// A trailing comma is allowed; empty elements are rejected:
+/// ```compile_fail
+/// let _ = helper::hset! {1,, 2};
+/// ```
 #[proc_macro]
 pub fn hset(items: TokenStream) -> TokenStream {
     collections::hset(items.into()).into()
@@ -130,6 +231,12 @@ pub fn hset(items: TokenStream) -> TokenStream {
 /// let set = btset! {"a", "b"};
 /// assert!(set.contains("a"));
 /// assert!(set.contains("b"));
+/// ```
+///
+/// Elements are Rust expressions and are evaluated once, in input order.
+/// A trailing comma is allowed; empty elements are rejected:
+/// ```compile_fail
+/// let _ = helper::btset! {,1};
 /// ```
 #[proc_macro]
 pub fn btset(items: TokenStream) -> TokenStream {
@@ -147,6 +254,14 @@ pub fn btset(items: TokenStream) -> TokenStream {
 /// let x = 42i32;
 /// let y = u8!(x);
 /// assert_eq!(y, 42u8);
+/// ```
+///
+/// Exactly one Rust expression is required:
+/// ```compile_fail
+/// let _ = helper::u8!();
+/// ```
+/// ```compile_fail
+/// let _ = helper::u8!(1, 2);
 /// ```
 #[proc_macro]
 pub fn u8(items: TokenStream) -> TokenStream {
@@ -324,9 +439,9 @@ pub fn isize(items: TokenStream) -> TokenStream {
 /// ```
 /// use helper::f32;
 ///
-/// let x = 3.14f64;
+/// let x = 13.25f64;
 /// let y = f32!(x);
-/// assert_eq!(y, 3.14f32);
+/// assert_eq!(y, 13.25f32);
 /// ```
 #[proc_macro]
 pub fn f32(items: TokenStream) -> TokenStream {
@@ -339,9 +454,9 @@ pub fn f32(items: TokenStream) -> TokenStream {
 /// ```
 /// use helper::f64;
 ///
-/// let x = 3.14f32;
+/// let x = 13.25f32;
 /// let y = f64!(x);
-/// assert!((y - 3.14f64).abs() < 0.0001);
+/// assert_eq!(y, 13.25f64);
 /// ```
 #[proc_macro]
 pub fn f64(items: TokenStream) -> TokenStream {

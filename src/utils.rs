@@ -10,6 +10,32 @@
 
 #[cfg(test)]
 use proc_macro2::TokenStream;
+use syn::{
+    fold::{self, Fold},
+    parse::ParseStream,
+    Expr, ExprParen, Result,
+};
+
+pub(crate) fn parse_expr(input: ParseStream<'_>) -> Result<Expr> {
+    input.parse().map(|expr| ParenthesizeGroups.fold_expr(expr))
+}
+
+struct ParenthesizeGroups;
+
+impl Fold for ParenthesizeGroups {
+    fn fold_expr(&mut self, expr: Expr) -> Expr {
+        match fold::fold_expr(self, expr) {
+            // rustc can ignore invisible groups re-emitted by a proc macro
+            // (rust-lang/rust#67062). Preserve their precedence with parentheses.
+            Expr::Group(group) => Expr::Paren(ExprParen {
+                attrs: group.attrs,
+                paren_token: syn::token::Paren(group.group_token.span),
+                expr: group.expr,
+            }),
+            expr => expr,
+        }
+    }
+}
 
 #[cfg(test)]
 pub(crate) fn pm_test_left(f: impl FnOnce(TokenStream) -> TokenStream, s: &str) -> String {
