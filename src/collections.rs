@@ -19,11 +19,19 @@ use syn::{
 use crate::utils::parse_expr;
 
 pub(crate) fn hmap(items: TokenStream) -> TokenStream {
-    map(items, quote!(::std::collections::HashMap), true)
+    map(items, quote!(::std::collections::HashMap), true, false)
+}
+
+pub(crate) fn hmap_into(items: TokenStream) -> TokenStream {
+    map(items, quote!(::std::collections::HashMap), true, true)
 }
 
 pub(crate) fn btmap(items: TokenStream) -> TokenStream {
-    map(items, quote!(::std::collections::BTreeMap), false)
+    map(items, quote!(::std::collections::BTreeMap), false, false)
+}
+
+pub(crate) fn btmap_into(items: TokenStream) -> TokenStream {
+    map(items, quote!(::std::collections::BTreeMap), false, true)
 }
 
 struct MapEntry {
@@ -40,7 +48,9 @@ impl Parse for MapEntry {
     }
 }
 
-fn map(items: TokenStream, qualifier: TokenStream, has_capacity: bool) -> TokenStream {
+fn map(
+    items: TokenStream, qualifier: TokenStream, has_capacity: bool, convert: bool,
+) -> TokenStream {
     let entries = match Punctuated::<MapEntry, Token![,]>::parse_terminated.parse2(items) {
         Ok(entries) => entries,
         Err(error) => return error.into_compile_error(),
@@ -54,6 +64,8 @@ fn map(items: TokenStream, qualifier: TokenStream, has_capacity: bool) -> TokenS
     // Keep the generated binding separate from identifiers in user expressions.
     let map = Ident::new("map", Span::mixed_site());
     let inserts = entries.iter().map(|MapEntry { key, value }| {
+        let key = convert_expr(key, convert);
+        let value = convert_expr(value, convert);
         quote! { let _ = #map.insert(#key, #value); }
     });
 
@@ -65,14 +77,24 @@ fn map(items: TokenStream, qualifier: TokenStream, has_capacity: bool) -> TokenS
 }
 
 pub(crate) fn hset(items: TokenStream) -> TokenStream {
-    seq(items, quote!(::std::collections::HashSet), true)
+    seq(items, quote!(::std::collections::HashSet), true, false)
+}
+
+pub(crate) fn hset_into(items: TokenStream) -> TokenStream {
+    seq(items, quote!(::std::collections::HashSet), true, true)
 }
 
 pub(crate) fn btset(items: TokenStream) -> TokenStream {
-    seq(items, quote!(::std::collections::BTreeSet), false)
+    seq(items, quote!(::std::collections::BTreeSet), false, false)
 }
 
-fn seq(items: TokenStream, qualifier: TokenStream, has_capacity: bool) -> TokenStream {
+pub(crate) fn btset_into(items: TokenStream) -> TokenStream {
+    seq(items, quote!(::std::collections::BTreeSet), false, true)
+}
+
+fn seq(
+    items: TokenStream, qualifier: TokenStream, has_capacity: bool, convert: bool,
+) -> TokenStream {
     let parser = |input: ParseStream<'_>| {
         Punctuated::<Expr, Token![,]>::parse_terminated_with(input, parse_expr)
     };
@@ -87,13 +109,21 @@ fn seq(items: TokenStream, qualifier: TokenStream, has_capacity: bool) -> TokenS
     }
 
     let seq = Ident::new("seq", Span::mixed_site());
-    let elements = elements.iter();
+    let elements = elements.iter().map(|expr| convert_expr(expr, convert));
 
     quote! {{
         let mut #seq = #constructor;
         #(let _ = #seq.insert(#elements);)*
         #seq
     }}
+}
+
+fn convert_expr(expr: &Expr, convert: bool) -> TokenStream {
+    if convert {
+        quote!(::core::convert::Into::into(#expr))
+    } else {
+        quote!(#expr)
+    }
 }
 
 fn constructor(qualifier: &TokenStream, len: usize, has_capacity: bool) -> TokenStream {

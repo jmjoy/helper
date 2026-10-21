@@ -13,11 +13,40 @@ use proc_macro2::TokenStream;
 use syn::{
     fold::{self, Fold},
     parse::ParseStream,
-    Expr, ExprParen, Result,
+    Block, Expr, ExprParen, Result, Stmt, TraitBound, Type,
 };
 
 pub(crate) fn parse_expr(input: ParseStream<'_>) -> Result<Expr> {
     input.parse().map(|expr| ParenthesizeGroups.fold_expr(expr))
+}
+
+pub(crate) fn parse_type(input: ParseStream<'_>) -> Result<Type> {
+    input.parse().map(|ty| ParenthesizeGroups.fold_type(ty))
+}
+
+pub(crate) fn parse_trait_bound(input: ParseStream<'_>) -> Result<TraitBound> {
+    input
+        .parse()
+        .map(|bound| ParenthesizeGroups.fold_trait_bound(bound))
+}
+
+pub(crate) fn parse_statements(input: ParseStream<'_>) -> Result<Vec<Stmt>> {
+    Block::parse_within(input).map(|statements| {
+        statements
+            .into_iter()
+            .map(|stmt| ParenthesizeGroups.fold_stmt(stmt))
+            .collect()
+    })
+}
+
+pub(crate) fn unparenthesized_expr(mut expr: &Expr) -> &Expr {
+    loop {
+        expr = match expr {
+            Expr::Paren(paren) => &paren.expr,
+            Expr::Group(group) => &group.expr,
+            _ => return expr,
+        };
+    }
 }
 
 struct ParenthesizeGroups;
