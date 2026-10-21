@@ -12,6 +12,8 @@
 #![warn(clippy::dbg_macro, clippy::print_stdout)]
 #![doc = include_str!("../README.md")]
 
+pub(crate) mod assertions;
+pub(crate) mod capture;
 pub(crate) mod collections;
 pub(crate) mod control;
 pub(crate) mod strings;
@@ -19,6 +21,75 @@ pub(crate) mod types;
 pub(crate) mod utils;
 
 use proc_macro::TokenStream;
+
+/// Assert at compile time that a type implements every listed trait.
+///
+/// Accepts `Type: Trait, OtherTrait, ...`, with an optional trailing comma.
+/// Bounds can contain generic arguments, associated type bindings, and
+/// higher-ranked lifetimes. Unsized types are supported. At least one trait is
+/// required; bounds with `?` are rejected.
+///
+/// Assertions are anonymous const items, usable at module scope or inside a
+/// block for concrete types. They generate no runtime work and use only `core`.
+///
+/// # Examples
+/// ```
+/// use helper::assert_impl_all;
+///
+/// assert_impl_all!(String: Send, Sync, Clone);
+/// assert_impl_all!(u8: Into<u16>, Into<u32>,);
+/// assert_impl_all!(str: Send, Sync);
+/// ```
+///
+/// Missing implementations cause a compile error:
+/// ```compile_fail
+/// helper::assert_impl_all!(std::rc::Rc<u8>: Send, Sync);
+/// ```
+/// A nonempty comma-separated trait list is required:
+/// ```compile_fail
+/// helper::assert_impl_all!(u8:);
+/// ```
+#[proc_macro]
+pub fn assert_impl_all(items: TokenStream) -> TokenStream {
+    assertions::assert_impl_all(items.into()).into()
+}
+
+/// Assert at compile time that a type implements none of the listed traits.
+///
+/// Each trait is checked independently: implementing even one listed trait
+/// causes a compile error. Accepts `Type: Trait, OtherTrait, ...`, with an
+/// optional trailing comma. Generic arguments, associated type bindings,
+/// higher-ranked lifetimes, and unsized target types are supported.
+/// At least one trait is required; bounds with `?` are rejected.
+///
+/// Assertions are anonymous const items, usable at module scope or inside a
+/// block for concrete types. They generate no runtime work and use only `core`.
+///
+/// # Examples
+/// ```
+/// use helper::assert_not_impl_any;
+///
+/// assert_not_impl_any!(std::rc::Rc<u8>: Send, Sync);
+/// assert_not_impl_any!(str: Sized, Copy,);
+/// ```
+///
+/// Implementing just one of the listed traits is sufficient to fail:
+/// ```compile_fail
+/// #[derive(Clone)]
+/// struct Value;
+/// helper::assert_not_impl_any!(Value: Copy, Clone);
+/// ```
+/// ```compile_fail
+/// helper::assert_not_impl_any!(u8: Copy);
+/// ```
+/// A nonempty trait list is required:
+/// ```compile_fail
+/// helper::assert_not_impl_any!(u8:);
+/// ```
+#[proc_macro]
+pub fn assert_not_impl_any(items: TokenStream) -> TokenStream {
+    assertions::assert_not_impl_any(items.into()).into()
+}
 
 /// Select between two expressions using a boolean condition.
 ///
@@ -69,6 +140,282 @@ use proc_macro::TokenStream;
 #[proc_macro]
 pub fn either(items: TokenStream) -> TokenStream {
     control::either(items.into()).into()
+}
+
+/// Clone named variables before creating a `move` closure or `async move`
+/// block.
+///
+/// Each listed variable is cloned exactly once, in list order, using
+/// [`Clone::clone`]. The clones are scoped to the returned closure or future;
+/// the original bindings remain available. Other variables follow the normal
+/// capture rules of the closure or async block. Cloning happens immediately,
+/// even if the returned closure or future is never run.
+/// Cloned bindings can be mutated inside the closure or future.
+///
+/// The capture list contains distinct variable names, with an optional trailing
+/// comma. The whole invocation also accepts a trailing comma. An empty list is
+/// allowed. The expansion uses only `core`.
+///
+/// # Examples
+/// ```
+/// use helper::capture;
+/// use std::sync::Arc;
+///
+/// let message = Arc::new(String::from("hello"));
+/// let callback = capture!([message], move || message.len());
+/// assert_eq!(callback(), 5);
+/// assert_eq!(message.as_str(), "hello");
+///
+/// let task = capture!([message,], async move { message.len() },);
+/// assert_eq!(Arc::strong_count(&message), 3);
+/// drop(task);
+/// ```
+///
+/// A `move` closure or `async move` block is required:
+/// ```compile_fail
+/// let callback = helper::capture!([], || 42);
+/// ```
+/// ```compile_fail
+/// let task = helper::capture!([], async { 42 });
+/// ```
+/// Duplicate captures are rejected:
+/// ```compile_fail
+/// let value = String::from("hello");
+/// let callback = helper::capture!([value, value], move || value);
+/// ```
+/// Each capture must be a variable name:
+/// ```compile_fail
+/// let values = [String::from("hello")];
+/// let callback = helper::capture!([values[0]], move || 42);
+/// ```
+#[proc_macro]
+pub fn capture(items: TokenStream) -> TokenStream {
+    capture::capture(items.into()).into()
+}
+
+/// Execute statements when the enclosing scope is exited.
+///
+/// Cleanup runs once on normal scope exit, early `return`, `?`, `break`,
+/// `continue`, or panic unwinding. Multiple defers run in reverse registration
+/// order. Cleanup does not run when the process aborts or exits without
+/// unwinding.
+///
+/// The body behaves like a zero-argument closure returning `()`: it borrows
+/// values when possible and moves values that it consumes. Borrows last until
+/// cleanup runs. A `return` in the body returns from the cleanup closure.
+///
+/// Invoke this macro as a statement in the scope to clean up. It generates a
+/// local drop guard, uses only `core`, and requires no allocation or unsafe
+/// code.
+///
+/// # Example
+/// ```
+/// use helper::defer;
+/// use std::cell::RefCell;
+///
+/// let events = RefCell::new(Vec::new());
+/// {
+///     defer! { events.borrow_mut().push("first"); }
+///     defer! { events.borrow_mut().push("second"); }
+///     events.borrow_mut().push("body");
+/// }
+/// assert_eq!(*events.borrow(), ["body", "second", "first"]);
+/// ```
+#[proc_macro]
+pub fn defer(items: TokenStream) -> TokenStream {
+    control::defer(items.into()).into()
+}
+
+/// Remove common indentation from a string or byte string literal at compile
+/// time.
+///
+/// Accepts one ordinary or raw string literal, including byte strings, and an
+/// optional trailing comma. The output is a string literal (`&'static str`) or
+/// byte string literal (`&'static [u8; N]`), suitable for `const`, `static`,
+/// `concat!`, and formatting macros. No runtime work, allocation, unsafe code,
+/// or dependency on `std` is generated.
+///
+/// The first line is excluded when computing the minimum indentation. If it
+/// consists of only a line ending (`\n` or `\r\n`), it is removed; otherwise
+/// it is preserved unchanged. Remaining lines containing only spaces or tabs
+/// are also excluded when computing the minimum. With no remaining content
+/// lines, the minimum is zero. Up to that many leading spaces or tabs are
+/// removed from each line after the first. Each space or tab counts as one
+/// character, without expanding tabs. Other whitespace, relative indentation,
+/// line endings, and trailing whitespace are preserved.
+///
+/// # Examples
+/// ```
+/// use helper::indoc;
+///
+/// const SQL: &str = indoc! {r#"
+///     SELECT id, name
+///     FROM users
+///     WHERE active = true
+/// "#};
+/// assert_eq!(SQL, "SELECT id, name\nFROM users\nWHERE active = true\n");
+///
+/// const BYTES: &[u8; 3] = indoc!(b"\n    \xff\0\n",);
+/// assert_eq!(BYTES, b"\xff\0\n");
+/// ```
+///
+/// The result can be used as a format string, with explicit format arguments:
+/// ```
+/// let message = format!(helper::indoc!("\n    Hello, {name}!\n"), name = "Rust");
+/// assert_eq!(message, "Hello, Rust!\n");
+/// ```
+/// Format arguments must be passed explicitly because the format string comes
+/// from a macro.
+///
+/// Exactly one string or byte string literal is required:
+/// ```compile_fail
+/// let _ = helper::indoc!();
+/// ```
+/// ```compile_fail
+/// let _ = helper::indoc!("first", "second");
+/// ```
+/// ```compile_fail
+/// let _ = helper::indoc!(42);
+/// ```
+/// ```compile_fail
+/// let _ = helper::indoc!('x');
+/// ```
+/// ```compile_fail
+/// let _ = helper::indoc!(concat!("first", "second"));
+/// ```
+#[proc_macro]
+pub fn indoc(items: TokenStream) -> TokenStream {
+    strings::indoc(items.into()).into()
+}
+
+/// Decode a hexadecimal string literal into a `[u8; N]` at compile time.
+///
+/// Uppercase and lowercase digits are accepted. ASCII whitespace is ignored,
+/// including between the two digits of a byte. Empty input produces `[u8; 0]`.
+/// Any other character or an odd number of digits causes a compile error.
+/// One string literal is required; a trailing comma is allowed.
+///
+/// The expansion works in `const` and `static` initializers, uses only `core`,
+/// and performs no runtime decoding or allocation.
+///
+/// # Example
+/// ```
+/// use helper::hex;
+///
+/// const MAGIC: [u8; 4] = hex!("DE AD be ef");
+/// assert_eq!(MAGIC, [0xde, 0xad, 0xbe, 0xef]);
+/// assert_eq!(hex!(r#"00 ff"#,), [0, 255]);
+/// ```
+///
+/// Invalid characters and incomplete bytes are rejected:
+/// ```compile_fail
+/// let _ = helper::hex!("0g");
+/// ```
+/// ```compile_fail
+/// let _ = helper::hex!("abc");
+/// ```
+/// The input must be one string literal:
+/// ```compile_fail
+/// let _ = helper::hex!(b"deadbeef");
+/// ```
+/// ```compile_fail
+/// let _ = helper::hex!("de", "ad");
+/// ```
+/// ```compile_fail
+/// let _ = helper::hex!();
+/// ```
+#[proc_macro]
+pub fn hex(items: TokenStream) -> TokenStream {
+    strings::hex(items.into()).into()
+}
+
+/// Concatenate byte literals, byte string literals, and byte arrays at compile
+/// time, producing a `&'static [u8; N]`.
+///
+/// Array elements must be byte literals or integer literals in `0..=255`, with
+/// no suffix or the `u8` suffix. Repeated arrays such as `[b'!'; 3]` are also
+/// supported; the count must be a nonnegative integer literal with no suffix or
+/// the `usize` suffix. Raw byte strings, empty input, and trailing commas are
+/// allowed. The expansion is a byte string literal and works without `std` or
+/// an allocator, including in `const` and `static` initializers.
+///
+/// # Example
+/// ```
+/// use helper::concat_bytes;
+///
+/// const HEADER: &[u8; 4] = concat_bytes!(b"PK", [3, 4]);
+/// assert_eq!(HEADER, b"PK\x03\x04");
+/// assert_eq!(
+///     concat_bytes!(b'A', br"BC", [68u8, b'E'], [b'!'; 2],),
+///     b"ABCDE!!"
+/// );
+/// ```
+///
+/// String and character literals must be byte literals:
+/// ```compile_fail
+/// let _ = helper::concat_bytes!("hello");
+/// ```
+/// ```compile_fail
+/// let _ = helper::concat_bytes!('a');
+/// ```
+/// Array elements must fit in a byte and have the correct type:
+/// ```compile_fail
+/// let _ = helper::concat_bytes!([256]);
+/// ```
+/// ```compile_fail
+/// let _ = helper::concat_bytes!([1u16]);
+/// ```
+/// Integer literals belong inside arrays:
+/// ```compile_fail
+/// let _ = helper::concat_bytes!(65);
+/// ```
+#[proc_macro]
+pub fn concat_bytes(items: TokenStream) -> TokenStream {
+    strings::concat_bytes(items.into()).into()
+}
+
+/// Include a UTF-8 file as a `&'static str`, trimming leading and trailing
+/// ASCII whitespace at compile time.
+///
+/// Whitespace means space, tab, line feed, vertical tab, form feed, and
+/// carriage return. Interior whitespace and non-ASCII whitespace are preserved.
+/// Empty files and files containing only ASCII whitespace produce `""`.
+///
+/// Paths are relative to the calling file, just like [`include_str!`]. The path
+/// may be a string literal or a macro expanding to one, such as `concat!` or
+/// `env!`; a trailing comma is allowed. File changes trigger recompilation.
+///
+/// Copying and trimming happen at compile time. The expansion uses only `core`,
+/// allocates nothing at runtime, contains no unsafe code, and works in `const`
+/// and `static` initializers on Rust 1.72 and later.
+///
+/// # Example
+/// ```
+/// use helper::include_str_trimmed;
+///
+/// const MANIFEST: &str =
+///     include_str_trimmed!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml",));
+/// assert!(MANIFEST.starts_with("[package]"));
+/// assert!(!MANIFEST.ends_with('\n'));
+/// ```
+///
+/// Files must contain valid UTF-8:
+/// ```compile_fail
+/// let _ = helper::include_str_trimmed!(concat!(
+///     env!("CARGO_MANIFEST_DIR"),
+///     "/tests/fixtures/include_c_str/non_utf8.bin",
+/// ));
+/// ```
+/// Exactly one path is required:
+/// ```compile_fail
+/// let _ = helper::include_str_trimmed!();
+/// ```
+/// ```compile_fail
+/// let _ = helper::include_str_trimmed!("first.txt", "second.txt");
+/// ```
+#[proc_macro]
+pub fn include_str_trimmed(items: TokenStream) -> TokenStream {
+    strings::include_str_trimmed(items.into()).into()
 }
 
 /// Include a file as a [`&'static CStr`](core::ffi::CStr).
@@ -169,6 +516,35 @@ pub fn hmap(items: TokenStream) -> TokenStream {
     collections::hmap(items.into()).into()
 }
 
+/// Create a [`std::collections::HashMap`], converting every key and value with
+/// [`Into::into`].
+///
+/// The target types must be determined by the surrounding context, typically a
+/// type annotation. Each key is evaluated and converted before its value, and
+/// entries are processed once in input order. A later duplicate converted key
+/// replaces the earlier value. Empty maps and trailing commas are supported.
+///
+/// # Example
+/// ```
+/// use helper::hmap_into;
+/// use std::collections::HashMap;
+///
+/// let headers: HashMap<String, String> = hmap_into! {
+///     "Accept": "application/json",
+///     "User-Agent": String::from("helper"),
+/// };
+/// assert_eq!(headers["Accept"], "application/json");
+/// ```
+///
+/// Every entry requires a key and a value:
+/// ```compile_fail
+/// let _: std::collections::HashMap<String, String> = helper::hmap_into! {"key":};
+/// ```
+#[proc_macro]
+pub fn hmap_into(items: TokenStream) -> TokenStream {
+    collections::hmap_into(items.into()).into()
+}
+
 /// Create [`std::collections::BTreeMap`] from list of key-value pairs.
 ///
 /// # Example
@@ -201,6 +577,38 @@ pub fn btmap(items: TokenStream) -> TokenStream {
     collections::btmap(items.into()).into()
 }
 
+/// Create a [`std::collections::BTreeMap`], converting each key and value with
+/// [`Into::into`].
+///
+/// Target types are determined by the surrounding context, typically a type
+/// annotation. Keys and values are evaluated and converted once in input order,
+/// with each key converted before its value. A later duplicate converted key
+/// replaces the earlier value. Empty maps and trailing commas are supported.
+///
+/// # Example
+/// ```
+/// use helper::btmap_into;
+/// use std::collections::BTreeMap;
+///
+/// let values: BTreeMap<String, String> = btmap_into! {
+///     "z": "last",
+///     String::from("a"): String::from("first"),
+/// };
+/// assert_eq!(
+///     values.keys().map(String::as_str).collect::<Vec<_>>(),
+///     ["a", "z"]
+/// );
+/// ```
+///
+/// Every entry requires a key and a value:
+/// ```compile_fail
+/// let _: std::collections::BTreeMap<String, String> = helper::btmap_into! {"key":};
+/// ```
+#[proc_macro]
+pub fn btmap_into(items: TokenStream) -> TokenStream {
+    collections::btmap_into(items.into()).into()
+}
+
 /// Create a [`std::collections::HashSet`] from a list of elements.
 ///
 /// # Example
@@ -222,6 +630,33 @@ pub fn hset(items: TokenStream) -> TokenStream {
     collections::hset(items.into()).into()
 }
 
+/// Create a [`std::collections::HashSet`], converting every element with
+/// [`Into::into`].
+///
+/// The target element type must be determined by the surrounding context,
+/// typically a type annotation. Elements are evaluated and converted once in
+/// input order; equal converted values are deduplicated. Empty sets and
+/// trailing commas are supported.
+///
+/// # Example
+/// ```
+/// use helper::hset_into;
+/// use std::collections::HashSet;
+///
+/// let names: HashSet<String> = hset_into! {"alice", String::from("bob"), "alice"};
+/// assert_eq!(names.len(), 2);
+/// assert!(names.contains("alice"));
+/// ```
+///
+/// Empty elements are rejected:
+/// ```compile_fail
+/// let _: std::collections::HashSet<String> = helper::hset_into! {"alice",, "bob"};
+/// ```
+#[proc_macro]
+pub fn hset_into(items: TokenStream) -> TokenStream {
+    collections::hset_into(items.into()).into()
+}
+
 /// Create a [`std::collections::BTreeSet`] from a list of elements.
 ///
 /// # Example
@@ -241,6 +676,32 @@ pub fn hset(items: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn btset(items: TokenStream) -> TokenStream {
     collections::btset(items.into()).into()
+}
+
+/// Create a [`std::collections::BTreeSet`], converting each element with
+/// [`Into::into`].
+///
+/// The target element type is determined by the surrounding context, typically
+/// a type annotation. Elements are evaluated and converted once in input order,
+/// and equal converted values are deduplicated. Empty sets and trailing commas
+/// are supported.
+///
+/// # Example
+/// ```
+/// use helper::btset_into;
+/// use std::collections::BTreeSet;
+///
+/// let names: BTreeSet<String> = btset_into! {"bob", String::from("alice"), "bob"};
+/// assert_eq!(names.into_iter().collect::<Vec<_>>(), ["alice", "bob"]);
+/// ```
+///
+/// Empty elements are rejected:
+/// ```compile_fail
+/// let _: std::collections::BTreeSet<String> = helper::btset_into! {"alice",, "bob"};
+/// ```
+#[proc_macro]
+pub fn btset_into(items: TokenStream) -> TokenStream {
+    collections::btset_into(items.into()).into()
 }
 
 // Type conversion macros for basic data types

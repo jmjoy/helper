@@ -8,7 +8,7 @@
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 use syn::{
     parse::{ParseStream, Parser},
@@ -16,7 +16,7 @@ use syn::{
     Expr, Token,
 };
 
-use crate::utils::parse_expr;
+use crate::utils::{parse_expr, parse_statements};
 
 pub(crate) fn either(items: TokenStream) -> TokenStream {
     let parser = |input: ParseStream<'_>| {
@@ -41,5 +41,32 @@ pub(crate) fn either(items: TokenStream) -> TokenStream {
 
     quote! {
         if (#condition) { #left } else { #right }
+    }
+}
+
+pub(crate) fn defer(items: TokenStream) -> TokenStream {
+    let statements = match parse_statements.parse2(items) {
+        Ok(statements) => statements,
+        Err(error) => return error.into_compile_error(),
+    };
+    let guard = Ident::new("__helper_defer_guard", Span::mixed_site());
+    let guard_type = Ident::new("__HelperDeferGuard", Span::mixed_site());
+
+    // The binding must live in the caller's scope, outside the initializer
+    // block.
+    quote! {
+        let #guard = {
+            struct #guard_type<F: ::core::ops::FnOnce()>(::core::option::Option<F>);
+
+            impl<F: ::core::ops::FnOnce()> ::core::ops::Drop for #guard_type<F> {
+                fn drop(&mut self) {
+                    if let ::core::option::Option::Some(callback) = self.0.take() {
+                        callback();
+                    }
+                }
+            }
+
+            #guard_type
+        }(::core::option::Option::Some(|| { #(#statements)* }));
     }
 }
