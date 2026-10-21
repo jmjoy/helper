@@ -12,6 +12,10 @@ A library provided some useful proc macros for Rust.
 
   - [**either**](https://docs.rs/helper/latest/helper/macro.either.html): Select between two expressions with `either!(condition, left, right)`.
 
+- **file inclusion**
+
+  - [**include_c_str**](https://docs.rs/helper/latest/helper/macro.include_c_str.html): Include a file as a `&'static core::ffi::CStr`, validating NUL bytes at compile time.
+
 - **collections**
 
   - [**btmap**](https://docs.rs/helper/latest/helper/macro.btmap.html): Create `std::collections::BTreeMap` from list of key-value pairs.
@@ -53,6 +57,29 @@ assert_eq!(value, 2);
 The condition is evaluated once, and only the selected branch is evaluated.
 All three arguments are Rust expressions and support the `?` operator.
 A trailing comma is optional.
+
+### C String Inclusion
+
+```rust
+use helper::include_c_str;
+
+const MANIFEST: &core::ffi::CStr = include_c_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/Cargo.toml",
+));
+assert!(MANIFEST.to_bytes().starts_with(b"[package]"));
+```
+
+Paths are relative to the file containing the invocation, just like
+`include_bytes!`. String literals, macros such as `concat!` and `env!`, and an
+optional trailing comma are supported. File changes trigger recompilation.
+A missing NUL terminator is appended, and an existing single terminator is
+preserved. Interior NUL bytes, including repeated trailing NULs, cause a compile
+error. Empty files and non-UTF-8 bytes are supported.
+
+The result works in `const` and `static` initializers and in `no_std` crates.
+Copying and validation happen at compile time, with no runtime allocation or
+unsafe code. Requires Rust 1.72 or later.
 
 ### Type Conversion
 

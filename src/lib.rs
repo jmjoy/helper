@@ -14,6 +14,7 @@
 
 pub(crate) mod collections;
 pub(crate) mod control;
+pub(crate) mod strings;
 pub(crate) mod types;
 pub(crate) mod utils;
 
@@ -68,6 +69,67 @@ use proc_macro::TokenStream;
 #[proc_macro]
 pub fn either(items: TokenStream) -> TokenStream {
     control::either(items.into()).into()
+}
+
+/// Include a file as a [`&'static CStr`](core::ffi::CStr).
+///
+/// The path is resolved relative to the file containing the invocation, just
+/// like [`include_bytes!`]. It must be a string literal or a macro expanding to
+/// one, such as `concat!(env!("CARGO_MANIFEST_DIR"), "/file.txt")`. A trailing
+/// comma is allowed.
+///
+/// A missing NUL terminator is appended; an existing single terminator is
+/// preserved. Any other NUL byte causes a compile error, even when the macro is
+/// used outside a `const` or `static`. Empty files and non-UTF-8 bytes are
+/// allowed. File changes are tracked by the compiler as with `include_bytes!`.
+///
+/// The result can be used in `const` and `static` initializers. The expansion
+/// uses only `core`, performs all copying and validation at compile time, and
+/// requires no allocation or unsafe code. Requires Rust 1.72 or later.
+///
+/// # Example
+/// ```
+/// use helper::include_c_str;
+///
+/// const MANIFEST: &core::ffi::CStr =
+///     include_c_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml",));
+/// assert_eq!(MANIFEST.to_bytes(), include_bytes!("../Cargo.toml"));
+/// ```
+///
+/// Interior NUL bytes are rejected during compilation:
+/// ```compile_fail
+/// let _ = helper::include_c_str!(concat!(
+///     env!("CARGO_MANIFEST_DIR"),
+///     "/tests/fixtures/include_c_str/interior_nul.bin",
+/// ));
+/// ```
+/// Leading NUL bytes and repeated terminators are also rejected:
+/// ```compile_fail
+/// let _ = helper::include_c_str!(concat!(
+///     env!("CARGO_MANIFEST_DIR"),
+///     "/tests/fixtures/include_c_str/leading_nul.bin",
+/// ));
+/// ```
+/// ```compile_fail
+/// let _ = helper::include_c_str!(concat!(
+///     env!("CARGO_MANIFEST_DIR"),
+///     "/tests/fixtures/include_c_str/repeated_nul.bin",
+/// ));
+/// ```
+///
+/// Exactly one path is required:
+/// ```compile_fail
+/// let _ = helper::include_c_str!();
+/// ```
+/// ```compile_fail
+/// let _ = helper::include_c_str!("first.txt", "second.txt");
+/// ```
+/// ```compile_fail
+/// let _ = helper::include_c_str!(123);
+/// ```
+#[proc_macro]
+pub fn include_c_str(items: TokenStream) -> TokenStream {
+    strings::include_c_str(items.into()).into()
 }
 
 /// Create [`std::collections::HashMap`] from list of key-value pairs.
