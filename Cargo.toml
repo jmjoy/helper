@@ -6,7 +6,7 @@ edition = "2021"
 rust-version = "1.72"
 repository = "https://github.com/jmjoy/helper"
 description = "A library provided some useful proc macros for Rust."
-license = "MulanPSL-2.0"
+license = "MulanPSL-2.0 OR Apache-2.0 OR MIT"
 keywords = ["hashmap", "maplit", "macro"]
 categories = ["accessibility", "rust-patterns"]
 

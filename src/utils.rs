@@ -1,12 +1,9 @@
 // Copyright (c) 2021 jmjoy
-// Helper is licensed under Mulan PSL v2.
-// You can use this software according to the terms and conditions of the Mulan
-// PSL v2. You may obtain a copy of Mulan PSL v2 at:
-//          http://license.coscl.org.cn/MulanPSL2
+// SPDX-License-Identifier: MulanPSL-2.0 OR Apache-2.0 OR MIT
 // THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
 // KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
 // NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-// See the Mulan PSL v2 for more details.
+// See LICENSE-MULAN, LICENSE-APACHE, and LICENSE-MIT for details.
 
 #[cfg(test)]
 use proc_macro2::TokenStream;
@@ -55,7 +52,8 @@ impl Fold for ParenthesizeGroups {
     fn fold_expr(&mut self, expr: Expr) -> Expr {
         match fold::fold_expr(self, expr) {
             // rustc can ignore invisible groups re-emitted by a proc macro
-            // (rust-lang/rust#67062). Preserve their precedence with parentheses.
+            // (rust-lang/rust#67062). Preserve their precedence with
+            // parentheses.
             Expr::Group(group) => Expr::Paren(ExprParen {
                 attrs: group.attrs,
                 paren_token: syn::token::Paren(group.group_token.span),
