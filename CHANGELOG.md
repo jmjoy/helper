@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.1](https://github.com/jmjoy/helper/compare/v5.0.0...v5.0.1) - 2026-11-12
+
+### Other
+
+- offer MulanPSL-2.0, Apache-2.0, or MIT licensing ([#9](https://github.com/jmjoy/helper/pull/9))
+
 ## [5.0.0](https://github.com/jmjoy/helper/compare/v4.0.0...v5.0.0) - 2026-10-21
 
 ### Added
